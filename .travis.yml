@@ -1,0 +1,22 @@
+language: python
+python:
+  - '3.6'
+
+# enable Python 3.7 support
+matrix:
+  include:
+    - python: 3.7
+      dist: xenial
+      sudo: true
+
+install:
+  - pip install pytest pytest-console-scripts
+  - pip install pytest-cov
+  - pip install coveralls
+  - pip install -e .
+  
+script:
+  - py.test --cov=easy_struct tests/*
+  
+after_success:
+  - coveralls
