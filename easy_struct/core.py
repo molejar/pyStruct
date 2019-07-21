@@ -43,15 +43,35 @@ class MetaStructure(type):
     """ MetaClass for Structure Type """
 
     def __new__(mcs, name, bases, ns):
-        if '__annotations__' in ns:
-            for key, value in ns['__annotations__'].items():
-                if isinstance(value, type):
-                    value = ns['__annotations__'][key] = value()
-                if not isinstance(value, (Struct, Int, String, Bytes, Array)):
-                    raise Exception()
+        if name != 'DataStructure':
+            if '__annotations__' in ns:
+                for key, value in ns['__annotations__'].items():
+                    if isinstance(value, type):
+                        value = ns['__annotations__'][key] = value()
+                    if not isinstance(value, (Struct, Int, String, Bytes, Array)):
+                        raise Exception()
+                    # create class attribute with default value
+                    ns[key] = value.default
 
-                # create class attribute with default value
-                ns[key] = value.default
+            else:
+                annotations = {}
+                for key, value in ns.items():
+                    # ignore hidden class attributes
+                    if key in set(dir(type(name, (object,), {}))) or (key.startswith('_') and key.endswith('_')):
+                        continue
+                    # ignore methods and properties
+                    if isinstance(value, type(Struct.validate)) or isinstance(value, staticmethod) or \
+                       isinstance(value, classmethod) or isinstance(value, property):
+                        continue
+                    # convert class to objects
+                    if isinstance(value, type):
+                        value = value()
+                    if not isinstance(value, (Struct, Int, String, Bytes, Array)):
+                        raise Exception()
+                    annotations[key] = value
+                    ns[key] = value.default
+
+                ns['__annotations__'] = annotations
 
         return super().__new__(mcs, name, bases, ns)
 

@@ -41,6 +41,13 @@ setup(
     description='User friendly implementation of C-like structure type in Python',
     long_description=long_description(),
     packages=['easy_struct'],
+    python_requires=">=3.5",
+    setup_requires=[
+        'setuptools>=40.0'
+    ],
+    install_requires=[
+        'easy_enum==0.2.0'
+    ],
     classifiers=[
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 3',

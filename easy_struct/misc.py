@@ -12,41 +12,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from easy_enum import EEnum
-
-
-def size_fmt(num, use_kibibyte=True):
-    base, suffix = [(1000., 'B'), (1024., 'iB')][use_kibibyte]
-    for x in ['B'] + [x + suffix for x in list('kMGTP')]:
-        if -base < num < base:
-            break
-        num /= base
-    return "{0:3.3f} {1:s}".format(num, x)
+from easy_enum import Enum
 
 
 def loff(offset, tabsize, string):
     return str(" " * (tabsize * offset)) + string
 
 
+def size_fmt(num, kibibyte=True):
+    base, suffix = [(1000., 'B'), (1024., 'iB')][kibibyte]
+    for x in ['B'] + [x + suffix for x in list('kMGTP')]:
+        if -base < num < base:
+            break
+        num /= base
+
+    return "{} {}".format(num, x) if x == 'B' else "{:3.2f} {}".format(num, x)
+
+
 def fmt_int(name, metadata, value, tabsize=4, offset=0):
 
     raw_value = value & (1 << (metadata.bytes * 8)) - 1 if value < 0 else value
 
-    if metadata.print_fmt in ('x', 'X'):
-        fmt = "{{}}: 0x{{:0{}{}}}".format(metadata.bytes * 2, metadata.print_fmt)
+    if metadata.print_format in ('x', 'X'):
+        fmt = "{{}}: 0x{{:0{}{}}}".format(metadata.bytes * 2, metadata.print_format)
         msg = loff(offset, tabsize, fmt.format(name, raw_value))
-    elif metadata.print_fmt in ('o', 'O'):
+    elif metadata.print_format in ('o', 'O'):
         msg = loff(offset, tabsize, "{}: 0{:o}".format(name, raw_value))
-    elif metadata.print_fmt in ('b', 'B'):
+    elif metadata.print_format in ('b', 'B'):
         fmt = "{{}}: 0b{{:0{}b}}".format(metadata.bytes * 8)
         msg = loff(offset, tabsize, fmt.format(name, raw_value))
-    elif metadata.print_fmt in ('sz', 'SZ'):
-        msg = loff(offset, tabsize, "{}: {} / {}".format(name, value, size_fmt(value, metadata.print_fmt == 'sz')))
+    elif metadata.print_format in ('sz', 'SZ'):
+        msg = loff(offset, tabsize, "{}: {} / {}".format(name, value, size_fmt(value, metadata.print_format == 'sz')))
     else:
         msg = loff(offset, tabsize, "{}: {}".format(name, value))
 
-    if isinstance(metadata.options, type) and issubclass(metadata.options, EEnum):
-        msg += " / {}.{}".format(metadata.options.__name__, metadata.options[value])
+    if isinstance(metadata.choices, type) and issubclass(metadata.choices, Enum):
+        msg += " / {}.{}".format(metadata.choices.__name__, metadata.choices[value])
 
     return msg + '\n'
 

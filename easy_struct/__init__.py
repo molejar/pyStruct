@@ -12,22 +12,51 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from easy_struct.items import *
-from easy_struct.core import *
+from easy_struct.items import Int, Float, String, Bytes, Array
+from easy_struct.items import Int8ul, Int8sl, Int8ub, Int8sb, Int16ul, Int16sl, Int16ub, Int16sb, Int24ul, Int24sl, \
+                              Int24ub, Int24sb, Int32ul, Int32sl, Int32ub, Int32sb, Int64ul, Int64sl, Int64ub, Int64sb
+from easy_struct.items import Float16l, Float16b, Float32l, Float32b, Float64l, Float64b
+from easy_struct.core import DataStructure, Struct
 
 __author__  = "Martin Olejar"
 __contact__ = "martin.olejar@gmail.com"
-__version__ = "0.1.1"
+__version__ = "0.0.1"
 __license__ = "Apache 2.0"
 __status__  = "Development"
-
 __all__ = [
     "DataStructure",
     "Struct",
     "String",
     "Bytes",
     "Array",
-    "Int"
+    "Float",
+    "Int",
+    # Int variants
+    'Int8ul',
+    'Int8sl',
+    'Int8ub',
+    'Int8sb',
+    'Int16ul',
+    'Int16sl',
+    'Int16ub',
+    'Int16sb',
+    'Int24ul',
+    'Int24sl',
+    'Int24ub',
+    'Int24sb',
+    'Int32ul',
+    'Int32sl',
+    'Int32ub',
+    'Int32sb',
+    'Int64ul',
+    'Int64sl',
+    'Int64ub',
+    'Int64sb',
+    # Float variants
+    'Float16l',
+    'Float16b',
+    'Float32l',
+    'Float32b',
+    'Float64l',
+    'Float64b'
 ]
-__all__ += [f"Int{n}{us}{bl}" for n in (8, 16, 24, 32, 64) for us in "us" for bl in "bl"]
-__all__ += [f"Float{n}{bl}" for n in (16, 32, 64) for bl in "bl"]

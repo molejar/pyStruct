@@ -28,7 +28,7 @@ In case of development, install pyEnum from sources:
 
 You may run into a permissions issues running these commands. Here are a few options how to fix it:
 
-1. Run with `sudo` to install pyEnum and dependencies globally
+1. Run with `sudo` to install pyStruct and dependencies globally
 2. Specify the `--user` option to install locally into your home directory (export "~/.local/bin" into PATH variable if haven't).
 3. Run the command in a [virtualenv](https://virtualenv.pypa.io/en/latest/) local to a specific project working set.
 

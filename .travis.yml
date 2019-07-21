@@ -10,7 +10,7 @@ matrix:
       sudo: true
 
 install:
-  - pip install pytest pytest-console-scripts
+  - pip install pytest
   - pip install pytest-cov
   - pip install coveralls
   - pip install -e .
