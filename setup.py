@@ -16,19 +16,12 @@
 
 from os import path
 from setuptools import setup
-from easy_enum import __version__, __license__, __author__, __contact__
+from easy_struct import __version__, __license__, __author__, __contact__
 
 
-def long_description():
-    try:
-        import pypandoc
-
-        readme_path = path.join(path.dirname(__file__), 'README.md')
-        return pypandoc.convert(readme_path, 'rst').replace('\r', '')
-    except (IOError, ImportError):
-        return (
-            "More on: https://github.com/molejar/pyStruct"
-        )
+def get_long_description():
+    with open(path.join(path.dirname(path.abspath(__file__)), 'README.md'), encoding='utf8') as fp:
+        return fp.read()
 
 
 setup(
@@ -39,14 +32,15 @@ setup(
     author_email=__contact__,
     url='https://github.com/molejar/pyStruct',
     description='User friendly implementation of C-like structure type in Python',
-    long_description=long_description(),
+    long_description=get_long_description(),
+    long_description_content_type='text/markdown',
     packages=['easy_struct'],
     python_requires=">=3.5",
     setup_requires=[
         'setuptools>=40.0'
     ],
     install_requires=[
-        'easy_enum==0.2.0'
+        'easy_enum==0.3.0'
     ],
     classifiers=[
         'Operating System :: OS Independent',

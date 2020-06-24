@@ -20,9 +20,9 @@ class ImageType(Enum):
 class DSClassic(DataStructure):
     """ Example of DataStructure using classic syntax """
 
-    signature = Int32ul(0x155729, pfmt='X', desc="Description of signature")
-    image_type = Int8ul(ImageType.STANDALONE, choices=ImageType)
-    image_size = Int32ul(1280000, pfmt='SZ')
+    signature = Int32ul(default=0x155729, pfmt='X', desc="Description of signature")
+    image_type = Int8u(default=ImageType.STANDALONE, choices=ImageType)
+    image_size = Int32ul(default=1280000, pfmt='SZ')
     _reserved0 = Int16ul(name="reserved", desc="Reserved for later usage")
     data = Bytes(100, empty=0x0F, name='raw_data', desc="Description of data item")
     items = Array(Int32sl, 5, offset=5, default=[0, 1, 2, 3, -10000000])
@@ -31,12 +31,18 @@ class DSClassic(DataStructure):
 class DSAttributes(DataStructure):
     """ Example of DataStructure using attributes syntax """
 
-    signature: Int32ul(0x155729, pfmt='X', desc="Description of signature")
-    image_type: Int8ul(ImageType.STANDALONE, choices=ImageType)
-    image_size: Int32ul(1280000, pfmt='SZ')
+    signature: Int32ul(default=0x155729, pfmt='X', desc="Description of signature")
+    image_type: Int8u(default=ImageType.STANDALONE, choices=ImageType)
+    image_size: Int32ul(default=1280000, pfmt='SZ')
     _reserved0: Int16ul(name="reserved", desc="Reserved for later usage")
     data: Bytes(100, empty=0x0F, name='raw_data', desc="Description of data item")
     items: Array(Int32sl, 5, offset=5, default=[0, 1, 2, 3, -10000000])
+
+
+def test_compare():
+    dsc = DSClassic()
+    dsa = DSAttributes()
+    assert dsa == dsc
 
 
 def test_data_structure():

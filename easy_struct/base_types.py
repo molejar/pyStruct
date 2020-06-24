@@ -12,22 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Optional, Union, Any
+from struct import unpack_from, pack
 from easy_enum import Enum
 
 
 ########################################################################################################################
-# Integer Type in Bits
+# The Integer Bitfield Type as Item for DataStructure
 ########################################################################################################################
-
 class IntBits:
 
     class_type = int
 
-    __slots__ = ('bits', 'endian', 'default', 'signed', 'offset', 'min_value', 'max_value', 'choices',
-                 'print_format', 'name', 'description')
+    __slots__ = ('bits', 'endian', 'default', 'signed', 'offset', 'min_value', 'max_value', 'choices', 'print_format',
+                 'name', 'description')
 
-    def __init__(self, bits, endian, default, signed=False, offset=0, min=None, max=None, choices=None, pfmt=None,
-                 name=None, desc=None):
+    def __init__(self, bits: int, offset: int = 0, default=0, endian: str = 'little', signed: bool = False,
+                 min: Optional[int] = None, max: Optional[int] = None, choices: Any = None,
+                 pfmt: Optional[str] = None, name: Optional[str] = None, desc: Optional[str] = None) -> None:
 
         assert bits > 0
         assert endian in ('big', 'little')
@@ -61,7 +63,11 @@ class IntBits:
                 self.choices = [self.validate(v) for v in choices]
             elif isinstance(choices, type) and issubclass(choices, Enum):
                 for item in choices:
-                    self.validate(item[1])
+                    try:
+                        self.validate(item[1])
+                    except ValueError as e:
+                        raise ValueError("choices: {}".format(str(e)))
+
                 self.choices = choices
             else:
                 raise Exception()
@@ -69,18 +75,27 @@ class IntBits:
         self.default = self.validate(default)
 
     @property
-    def size(self):
-        return (self.offset + self.bits) // 8
+    def size(self) -> int:
+        return self.bits
 
-    def pack(self, value):
-        return 0
+    def encode(self, value: int) -> int:
+        mask = (1 << self.bits) - 1
+        return (value & mask) << self.offset
 
-    def unpack(self, data, offset):
-        return 0
+    def decode(self, value: int) -> int:
+        mask = (1 << self.bits) - 1
+        ret_val = (value >> self.offset) & mask
+        return (ret_val ^ (1 << (self.bits - 1))) - (1 << (self.bits - 1)) if self.signed else ret_val
 
-    def validate(self, value):
+    def pack(self, value: int) -> bytes:
+        raise NotImplemented()
+
+    def unpack(self, data: bytes, offset: int = 0) -> int:
+        raise NotImplemented()
+
+    def validate(self, value: int) -> int:
         if not isinstance(value, int):
-            raise TypeError()
+            raise TypeError("The value type is '{}' and must be 'int'".format(type(value).__name__))
 
         if self.choices is None:
             if self.min_value is not None and value < self.min_value:
@@ -97,21 +112,22 @@ class IntBits:
 
 
 ########################################################################################################################
-# Integer Type in Bytes
+# The Integer Type in Bytes as Item for DataStructure
 ########################################################################################################################
-
 class Int:
 
     class_type = int
 
-    __slots__ = ('bytes', 'endian', 'default', 'signed', 'offset', 'min_value', 'max_value', 'choices',
+    __slots__ = ('bytes', 'endian', 'default', 'signed', 'offset', 'min_value', 'max_value', 'choices', 'constant',
                  'print_format', 'name', 'description')
 
-    def __init__(self, bytes, endian, default=0, signed=False, offset=0, min=None, max=None, choices=None, pfmt=None,
-                 name=None, desc=None):
+    def __init__(self, bytes: int, signed: bool = False, endian: str = 'little', default=0, offset: int = 0,
+                 min: Optional[int] = None, max: Optional[int] = None, choices: Any = None,
+                 pfmt: Optional[str] = None, name: Optional[str] = None, desc: Optional[str] = None) -> None:
 
         assert endian in ('big', 'little')
         assert isinstance(signed, bool)
+
         self.name = name
         self.bytes = bytes
         self.endian = endian
@@ -150,18 +166,18 @@ class Int:
         self.default = self.validate(default)
 
     @property
-    def size(self):
+    def size(self) -> int:
         return self.bytes
 
-    def pack(self, value):
+    def pack(self, value: int) -> bytes:
         return value.to_bytes(self.bytes, self.endian, signed=self.signed)
 
-    def unpack(self, data, offset=0):
+    def unpack(self, data: bytes, offset: int = 0) -> int:
         return int.from_bytes(data[offset: offset + self.bytes], self.endian, signed=self.signed)
 
-    def validate(self, value):
+    def validate(self, value: int) -> int:
         if not isinstance(value, int):
-            raise TypeError()
+            raise TypeError("The value type is '{}' and must be 'int'".format(type(value).__name__))
 
         if self.choices is None:
             if self.min_value is not None and value < self.min_value:
@@ -177,110 +193,9 @@ class Int:
         return value
 
 
-class Int8ul(Int):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt=None, name=None, desc=None):
-        super().__init__(1, 'little', default, False, offset, min, max, choices, pfmt, name, desc)
-
-
-class Int16ul(Int):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt=None, name=None, desc=None):
-        super().__init__(2, 'little', default, False, offset, min, max, choices, pfmt, name, desc)
-
-
-class Int24ul(Int):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt=None, name=None, desc=None):
-        super().__init__(3, 'little', default, False, offset, min, max, choices, pfmt, name, desc)
-
-
-class Int32ul(Int):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt=None, name=None, desc=None):
-        super().__init__(4, 'little', default, False, offset, min, max, choices, pfmt, name, desc)
-
-
-class Int64ul(Int):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt=None, name=None, desc=None):
-        super().__init__(8, 'little', default, False, offset, min, max, choices, pfmt, name, desc)
-
-
-class Int8ub(Int):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt=None, name=None, desc=None):
-        super().__init__(1, 'big', default, False, offset, min, max, choices, pfmt, name, desc)
-
-
-class Int16ub(Int):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt=None, name=None, desc=None):
-        super().__init__(2, 'big', default, False, offset, min, max, choices, pfmt, name, desc)
-
-
-class Int24ub(Int):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt=None, name=None, desc=None):
-        super().__init__(3, 'big', default, False, offset, min, max, choices, pfmt, name, desc)
-
-
-class Int32ub(Int):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt=None, name=None, desc=None):
-        super().__init__(4, 'big', default, False, offset, min, max, choices, pfmt, name, desc)
-
-
-class Int64ub(Int):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt=None, name=None, desc=None):
-        super().__init__(8, 'big', default, False, offset, min, max, choices, pfmt, name, desc)
-
-
-class Int8sl(Int):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt=None, name=None, desc=None):
-        super().__init__(1, 'little', default, True, offset, min, max, choices, pfmt, name, desc)
-
-
-class Int16sl(Int):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt=None, name=None, desc=None):
-        super().__init__(2, 'little', default, True, offset, min, max, choices, pfmt, name, desc)
-
-
-class Int24sl(Int):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt=None, name=None, desc=None):
-        super().__init__(3, 'little', default, True, offset, min, max, choices, pfmt, name, desc)
-
-
-class Int32sl(Int):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt=None, name=None, desc=None):
-        super().__init__(4, 'little', default, True, offset, min, max, choices, pfmt, name, desc)
-
-
-class Int64sl(Int):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt=None, name=None, desc=None):
-        super().__init__(8, 'little', default, False, offset, min, max, choices, pfmt, name, desc)
-
-
-class Int8sb(Int):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt=None, name=None, desc=None):
-        super().__init__(1, 'big', default, True, offset, min, max, choices, pfmt, name, desc)
-
-
-class Int16sb(Int):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt=None, name=None, desc=None):
-        super().__init__(2, 'big', default, True, offset, min, max, choices, pfmt, name, desc)
-
-
-class Int24sb(Int):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt=None, name=None, desc=None):
-        super().__init__(3, 'big', default, True, offset, min, max, choices, pfmt, name, desc)
-
-
-class Int32sb(Int):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt=None, name=None, desc=None):
-        super().__init__(4, 'big', default, True, offset, min, max, choices, pfmt, name, desc)
-
-
-class Int64sb(Int):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt=None, name=None, desc=None):
-        super().__init__(8, 'big', default, False, offset, min, max, choices, pfmt, name, desc)
-
-
 ########################################################################################################################
-# Float Type in Bytes
+# The Float Type in Bytes as Item for DataStructure
 ########################################################################################################################
-
 class Float:
 
     class_type = float
@@ -288,9 +203,11 @@ class Float:
     __slots__ = ('bytes', 'endian', 'default', 'offset', 'min_value', 'max_value', 'choices', 'print_format',
                  'name', 'description')
 
-    def __init__(self, bytes, endian, default, offset=0, min=None, max=None, choices=None, pfmt=None, name=None,
-                 desc=None):
+    def __init__(self, bytes: int, endian: str, default: float, offset: int = 0,
+                 min: Optional[float] = None, max: Optional[float] = None, choices: Any = None,
+                 pfmt: Optional[str] = None, name: Optional[str] = None, desc: Optional[str] = None) -> None:
 
+        assert bytes in (2, 4, 8)
         assert endian in ('big', 'little')
 
         self.name = name
@@ -305,23 +222,27 @@ class Float:
 
         if choices is not None:
             if not isinstance(choices, (tuple, list)):
-                raise Exception()
+                raise Exception("The choices type is '{}' and must be 'tuple' or 'list'".format(type(choices).__name__))
 
             self.choices = [self.validate(v) for v in choices]
 
         self.default = self.validate(default)
 
     @property
-    def size(self):
+    def size(self) -> int:
         return self.bytes
 
-    def pack(self, value):
-        pass
+    def pack(self, value: float) -> bytes:
+        fmt = {'little': '<', 'big': '>'}[self.endian]
+        fmt += {2: 'e', 4: 'f', 8: 'd'}[self.bytes]
+        return pack(fmt, value)
 
-    def unpack(self, data, offset=0):
-        pass
+    def unpack(self, data: bytes, offset: int = 0) -> float:
+        fmt = {'little': '<', 'big': '>'}[self.endian]
+        fmt += {2: 'e', 4: 'f', 8: 'd'}[self.bytes]
+        return unpack_from(fmt, data, offset)[0]
 
-    def validate(self, value):
+    def validate(self, value: float) -> float:
         if not isinstance(value, float):
             raise TypeError()
 
@@ -339,48 +260,21 @@ class Float:
         return value
 
 
-class Float16l(Float):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt='d', name=None, desc=None):
-        super().__init__(2, 'little', default, offset, min, max, choices, pfmt, name, desc)
-
-
-class Float32l(Float):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt='d', name=None, desc=None):
-        super().__init__(4, 'little', default, offset, min, max, choices, pfmt, name, desc)
-
-
-class Float64l(Float):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt='d', name=None, desc=None):
-        super().__init__(8, 'little', default, offset, min, max, choices, pfmt, name, desc)
-
-
-class Float16b(Float):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt='d', name=None, desc=None):
-        super().__init__(2, 'big', default, offset, min, max, choices, pfmt, name, desc)
-
-
-class Float32b(Float):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt='d', name=None, desc=None):
-        super().__init__(4, 'big', default, offset, min, max, choices, pfmt, name, desc)
-
-
-class Float64b(Float):
-    def __init__(self, default=0, offset=0, min=None, max=None, choices=None, pfmt='d', name=None, desc=None):
-        super().__init__(8, 'big', default, offset, min, max, choices, pfmt, name, desc)
-
-
 ########################################################################################################################
-# String Type
+# The String Type as Item for DataStructure
 ########################################################################################################################
-
 class String:
 
     class_type = str
 
     __slots__ = ('length', 'default', 'offset', 'empty', 'encoding', 'choices', 'name', 'description')
 
-    def __init__(self, length, default='', offset=0, empty=' ', encoding='ascii', choices=None, name=None, desc=None):
+    def __init__(self, length: int, default: str = '', offset: int = 0, empty: str = '\0', encoding: str = 'ascii',
+                 choices: Optional[list] = None, name: Optional[str] = None, desc: Optional[str] = None) -> None:
+
+        assert isinstance(empty, str) and len(empty) == 1
         assert encoding in ('ascii', 'utf-8', 'utf-16', 'utf-16-be', 'utf-16-le')
+
         self.name = name
         self.empty = empty
         self.length = length
@@ -388,11 +282,11 @@ class String:
         self.encoding = encoding
         self.choices = None
         self.description = desc
+
         if choices is not None:
-            if isinstance(choices, (tuple, list)):
-                self.choices = [self.validate(v) for v in choices]
-            else:
+            if not isinstance(choices, (tuple, list)):
                 raise Exception()
+            self.choices = [self.validate(v) for v in choices]
 
         if self.choices is not None and isinstance(default, int):
             self.default = self.choices[default]
@@ -401,24 +295,20 @@ class String:
         else:
             raise Exception()
 
-
-
     @property
-    def size(self):
-        char_size = {'ascii': 1, 'utf-8': 1, 'utf-16': 2, 'utf-16-be': 2, 'utf-16-le': 2}
-        return self.length * char_size[self.encoding]
+    def size(self) -> int:
+        return self.length * (1 if self.encoding in ('ascii', 'utf-8') else 2)
 
-    def pack(self, value):
+    def pack(self, value: str) -> bytes:
+        str_value = value
         if len(value) < self.length:
-            str_value = value + (self.empty * (self.length - len(value)))
-        else:
-            str_value = value
+            str_value += self.empty * (self.length - len(value))
         return str_value.encode(self.encoding)
 
-    def unpack(self, data, offset=0):
-        return data[offset: offset + self.size].decode(self.encoding).strip()
+    def unpack(self, data: bytes, offset: int = 0) -> str:
+        return data[offset: offset + self.size].decode(self.encoding).strip('\0').strip()
 
-    def validate(self, value):
+    def validate(self, value: str) -> str:
         if not isinstance(value, str):
             raise TypeError()
 
@@ -432,16 +322,17 @@ class String:
 
 
 ########################################################################################################################
-# Bytes Array Type
+# The Bytes Type as Item for DataStructure
 ########################################################################################################################
-
 class Bytes:
 
     class_type = (bytes, bytearray)
 
     __slots__ = ('size', 'empty', 'offset', 'default',  'name', 'description')
 
-    def __init__(self, size, empty=0, offset=0, default=None, name=None, desc=None):
+    def __init__(self, size: int, empty: int = 0, offset: int = 0, default: Union[bytes, bytearray, None] = None,
+                 name: Optional[str] = None, desc: Optional[str] = None) -> None:
+
         self.name = name
         self.size = size
         self.empty = empty
@@ -449,71 +340,78 @@ class Bytes:
         self.default = self.validate(default) if default is not None else default
         self.description = desc
 
-    def pack(self, value):
+    def pack(self, value: bytearray) -> bytes:
         return bytes(value)
 
-    def unpack(self, data, offset=0):
+    def unpack(self, data: bytes, offset: int = 0) -> bytearray:
         return bytearray(data[offset: offset + self.size])
 
-    def validate(self, value):
+    def validate(self, value: Union[bytes, bytearray]) -> bytearray:
         if not isinstance(value, (bytes, bytearray)):
             raise TypeError()
 
         if len(value) != self.size:
             raise ValueError()
 
-        return bytearray(value) if isinstance(value, bytes) else value
+        return value if isinstance(value, bytearray) else bytearray(value)
 
 
 ########################################################################################################################
-# Universal Array Type
+# The Array Type as Item for DataStructure
 ########################################################################################################################
-
 class Array:
 
     class_type = list
 
     __slots__ = ('item_type', 'length', 'offset', 'default', 'name', 'description')
 
-    def __init__(self, itype, length, offset=0, default=None, name=None, desc=None):
+    def __init__(self, itype, length: Union[int, str], offset: int = 0, default: Optional[list] = None,
+                 name: Optional[str] = None, desc: Optional[str] = None) -> None:
+
         assert isinstance(itype, (Int, Float, String)) or issubclass(itype, (Int, Float, String))
+
         self.name = name
         self.item_type = itype() if isinstance(itype, type) else itype
         self.length = length
         self.offset = offset
         self.description = desc
+
         if default is None:
-            self.default = [self.item_type.default for _ in range(length)]
+            self.default = [self.item_type.default for _ in range(length)] if isinstance(length, int) else []
         elif isinstance(default, list):
             self.default = self.validate(default)
         else:
             raise Exception()
 
     @property
-    def size(self):
-        return self.item_type.size * self.length
+    def size(self) -> int:
+        return self.item_type.size * self.length if isinstance(self.length, int) else None
 
-    def pack(self, value):
-        raw_data = bytes()
-        for v in value:
-            raw_data += self.item_type.pack(v)
-        return raw_data
+    def pack(self, values: list) -> bytes:
+        return b''.join(self.item_type.pack(v) for v in values)
 
-    def unpack(self, data, offset=0):
+    def unpack(self, data: bytes, offset: int = 0) -> list:
         values = []
         for i in range(self.length):
             values.append(self.item_type.unpack(data, offset))
             offset += self.item_type.size
         return values
 
-    def validate(self, value):
-        if not isinstance(value, list):
+    def validate(self, values: list) -> list:
+        if not isinstance(values, list):
             raise TypeError()
 
-        if len(value) != self.length:
+        if len(values) != self.length:
             raise ValueError()
 
-        for item in value:
+        for item in values:
             self.item_type.validate(item)
 
-        return value
+        return values
+
+
+########################################################################################################################
+# The Custom Int Type as Item for DataStructure
+########################################################################################################################
+class CInt:
+    pass
