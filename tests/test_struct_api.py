@@ -22,21 +22,21 @@ class DSClassic(DataStructure):
 
     signature = Int32ul(default=0x155729, pfmt='X', desc="Description of signature")
     image_type = Int8u(default=ImageType.STANDALONE, choices=ImageType)
-    image_size = Int32ul(default=1280000, pfmt='SZ')
+    image_size = Int32ul(default=1280000, pfmt='Z')
     _reserved0 = Int16ul(name="reserved", desc="Reserved for later usage")
-    data = Bytes(100, empty=0x0F, name='raw_data', desc="Description of data item")
-    items = Array(Int32sl, 5, offset=5, default=[0, 1, 2, 3, -10000000])
+    data = Bytes(length=100, empty=0x0F, name='raw_data', desc="Description of data item")
+    items = Array(itype=Int32sl, length=5, offset=5, default=[0, 1, 2, 3, -10000000])
 
 
 class DSAttributes(DataStructure):
     """ Example of DataStructure using attributes syntax """
 
-    signature: Int32ul(default=0x155729, pfmt='X', desc="Description of signature")
+    signature:  Int32ul(default=0x155729, pfmt='X', desc="Description of signature")
     image_type: Int8u(default=ImageType.STANDALONE, choices=ImageType)
-    image_size: Int32ul(default=1280000, pfmt='SZ')
+    image_size: Int32ul(default=1280000, pfmt='Z')
     _reserved0: Int16ul(name="reserved", desc="Reserved for later usage")
-    data: Bytes(100, empty=0x0F, name='raw_data', desc="Description of data item")
-    items: Array(Int32sl, 5, offset=5, default=[0, 1, 2, 3, -10000000])
+    data:       Bytes(length=100, empty=0x0F, name='raw_data', desc="Description of data item")
+    items:      Array(itype=Int32sl, length=5, offset=5, default=[0, 1, 2, 3, -10000000])
 
 
 def test_compare():

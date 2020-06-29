@@ -31,7 +31,7 @@ setup(
     author=__author__,
     author_email=__contact__,
     url='https://github.com/molejar/pyStruct',
-    description='User friendly implementation of C-like structure type in Python',
+    description='User friendly implementation of C-like structure in Python language',
     long_description=get_long_description(),
     long_description_content_type='text/markdown',
     packages=['easy_struct'],

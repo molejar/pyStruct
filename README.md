@@ -1,7 +1,7 @@
 pyStruct
 ========
 
-User friendly implementation of C-like structure type in Python language.
+User friendly implementation of C-like structure in Python language.
 
 Dependencies
 ------------
@@ -18,7 +18,7 @@ To install the latest version from master branch execute in shell following comm
     $ pip install -U https://github.com/molejar/pyStruct/archive/master.zip
 ```
 
-In case of development, install pyEnum from sources:
+In case of development, install pyStruct from sources:
 
 ``` bash
     $ git clone https://github.com/molejar/pyStruct.git
@@ -39,7 +39,7 @@ Example code:
 
 ``` Python
     import re
-    from easy_enum import EEnum as Enum
+    from easy_enum import Enum
     from easy_struct import *
 
     class MyEnum(Enum):
@@ -53,22 +53,22 @@ Example code:
         """ Example of Data Structure """
     
         # public member with string type
-        name: String(14, default="example string")
+        name: String(length=14, default="example string")
         
         # private members with 16-bit unsigned little endian type
         _major_version: Int16ul
         _minor_version: Int16ul
         
         # others public members
-        flags: Int8ul(MyEnum.ITEM2, opt=MyEnum)
-        user_id: Int16ul(0xF0F125D, fmt='X')
+        flags:   Int8ul(default=MyEnum.ITEM2, choices=MyEnum)
+        user_id: Int16ul(default=0xF0F125D, fmt='X')
         
         # reserved bytes can be defined as private member or skipt with offset parameter
         # _reserved: Int32ul
-        temperature: Int8sl(22, min=-20, max=100, offset=4)
+        temperature: Int8sl(default=22, min=-20, max=100, offset=4)
         
         # bytes array
-        data: Bytes(24)
+        data: Bytes(length=24)
     
         @property
         def version(self):

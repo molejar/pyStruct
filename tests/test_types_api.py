@@ -85,7 +85,7 @@ def test_string_type():
 
 
 def test_bytes_type():
-    value = Bytes(size=10)
+    value = Bytes(length=10)
     assert value.class_type == (bytes, bytearray)
     assert value.size == 10
     # validator test

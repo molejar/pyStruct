@@ -14,10 +14,15 @@
 
 from os import path
 from zlib import crc32
+from typing import Union, Any
 from datetime import datetime
 from easy_enum import Enum
-from easy_struct import DataStructure, Int8u, Int32u, String
+from easy_struct import DataStructure, Int8u, Int32u, String, Bytes, Struct, prefix
 
+
+########################################################################################################################
+# Enums
+########################################################################################################################
 
 class EnumImageType(Enum):
     """Supported UBoot Image Types"""
@@ -126,16 +131,31 @@ class EnumCompressionType(Enum):
     LZ4 = (5, 'lz4', 'Compressed with LZ4')
 
 
-class UImage(DataStructure, endian='little'):
-    """U-boot image Header"""
+########################################################################################################################
+# Helper functions
+########################################################################################################################
 
-    # private (hidden)
+def timestamp_print(name: str, value: Any, tabsize: int, offset: int, align: int) -> str:
+    info = prefix(offset, tabsize, name, align)
+    info += datetime.fromtimestamp(value).strftime("%H:%M:%S (%d.%m.%Y)")
+    info += "\n"
+    return info
+
+
+########################################################################################################################
+# U-boot image data structure with isolated header
+########################################################################################################################
+
+class ImgHeader(DataStructure, endian='little'):
+    # """The Header of U-boot Executable Image"""
+
+    # private (hidden) attributes
     _magic_number: Int32u(default=0x27051956, choices=[0x27051956], pfmt='X')
     _header_crc:   Int32u(pfmt='X')
-    _timestamp:    Int32u(pfmt='d')
+    _timestamp:    Int32u(pfmt=timestamp_print)
 
-    # public
-    data_size:     Int32u(pfmt='SZ')
+    # public attributes
+    data_size:     Int32u(pfmt='Z')
     load_address:  Int32u(pfmt='X')
     entry_address: Int32u(pfmt='X')
     data_crc:      Int32u(pfmt='X', desc="The CRC of data section")
@@ -143,53 +163,135 @@ class UImage(DataStructure, endian='little'):
     arch_type:     Int8u(default=EnumArchType.ARM, choices=EnumArchType)
     image_type:    Int8u(default=EnumImageType.FIRMWARE, choices=EnumImageType)
     compression:   Int8u(default=EnumCompressionType.NONE, choices=EnumCompressionType)
-    image_name:    String(length=32, default="UBoot")
+    image_name:    String(length=32, default="U-Boot Executable Image")
 
     @property
-    def timestamp(self):
+    def timestamp(self) -> datetime:
         return datetime.fromtimestamp(self._timestamp)
 
     @timestamp.setter
-    def timestamp(self, value):
-        if isinstance(value, datetime):
-            self._timestamp = value.timestamp()
-        elif isinstance(value, int):
-            self._timestamp = value
-        else:
-            raise ValueError()
+    def timestamp(self, value: Union[int, datetime]):
+        assert isinstance(value, (int, datetime))
+        self._timestamp = value if isinstance(value, int) else int(value.timestamp())
 
     def update(self):
         self._header_crc = 0
-        self._header_crc = crc32(self.export(update=False)) & 0xFFFFFFFF
+        self._header_crc = crc32(self.export(update=False))
 
     def validate(self):
         pars_crc = self._header_crc
         self._header_crc = 0
-        calc_crc = crc32(self.export(update=False)) & 0xFFFFFFFF
+        calc_crc = crc32(self.export(update=False))
         if pars_crc != calc_crc:
             raise Exception("Invalid Header CRC")
 
 
+class Img(DataStructure):
+    """U-boot Executable Image"""
+
+    header: Struct(ImgHeader)
+    data:   Bytes(length='header.data_size')
+
+    def update(self):
+        self.header.data_crc = crc32(self.data)
+        self.header.data_size = len(self.data)
+
+    def validate(self):
+        if self.header.data_crc != crc32(self.data):
+            raise Exception("Invalid Data CRC")
+
+
+########################################################################################################################
+#  U-boot image data structure as single container
+########################################################################################################################
+
+class UImage(DataStructure, endian='little'):
+    """U-boot Executable Image"""
+
+    # Image Header
+    _magic_number: Int32u(default=0x27051956, choices=[0x27051956], pfmt='X')  # hidden private attribute as constant
+    _header_crc:   Int32u(pfmt='X')                                            # hidden private attribute
+    _timestamp:    Int32u(pfmt=timestamp_print)                                # hidden attribute with public interface
+    data_size:     Int32u(pfmt='Z')                                            # public attribute
+    load_address:  Int32u(pfmt='X')
+    entry_address: Int32u(pfmt='X')
+    data_crc:      Int32u(pfmt='X', desc="The CRC of data section")
+    os_type:       Int8u(default=EnumOsType.LINUX, choices=EnumOsType)
+    arch_type:     Int8u(default=EnumArchType.ARM, choices=EnumArchType)
+    image_type:    Int8u(default=EnumImageType.FIRMWARE, choices=EnumImageType)
+    compression:   Int8u(default=EnumCompressionType.NONE, choices=EnumCompressionType)
+    image_name:    String(length=32, default="U-Boot Executable Image")
+
+    # Image Data (the length is specified in header)
+    image_data:    Bytes(length='data_size')
+
+    @property
+    def timestamp(self) -> datetime:
+        return datetime.fromtimestamp(self._timestamp)
+
+    @timestamp.setter
+    def timestamp(self, value: Union[int, datetime]):
+        assert isinstance(value, (int, datetime))
+        self._timestamp = value if isinstance(value, int) else int(value.timestamp())
+
+    def update(self):
+        self.data_crc = crc32(self.image_data)
+        self.data_size = len(self.image_data)
+        self._header_crc = 0
+        self._header_crc = crc32(self.export(update=False, ignore=['image_data']))
+
+    def validate(self):
+        pars_crc = self._header_crc
+        self._header_crc = 0
+        calc_crc = crc32(self.export(update=False, ignore=['image_data']))
+        if pars_crc != calc_crc:
+            raise Exception("Invalid Header CRC")
+        if self.data_crc != crc32(self.image_data):
+            raise Exception("Invalid Data CRC")
+
+
+########################################################################################################################
+# The main code (usage)
+########################################################################################################################
+
 if __name__ == "__main__":
 
+    # update to existing u-boot file name
     image_file = "file.bin"
 
     if path.exists(image_file):
         with open(image_file, 'rb') as f:
-            img = UImage.parse(f.read())
-            print(img.info(show_all=True))
+            data = f.read()
+            # parse1
+            img_obj = Img.parse(data)
+            print(img_obj.info(show_all=True))
+            # parse2
+            img_obj = UImage.parse(data)
+            print(img_obj.info(show_all=True))
 
     else:
-        img = UImage(entry_address=0x80000, data_size=128000)
+        # create image instance
+        img_obj = UImage(entry_address=0x80000, image_data=b'0'*160)
         # use property for set timestamp in datetime
-        img.timestamp = datetime(year=2020, month=6, day=12, hour=22)
+        img_obj.timestamp = datetime(year=2020, month=6, day=12, hour=22)
         # print image info
+        print(img_obj.info(show_all=True))
+        # export as bytes array
+        data = img_obj.export()
+
+        # parse and print info
+        img = Img.parse(data)
         print(img.info(show_all=True))
         # export as bytes array
-        data = img.export()
-        print(data)
-        print()
-        # parse and print info
-        img2 = UImage.parse(data)
-        print(img2.info())
-        print(img2 == img)
+        data2 = img.export()
+        # compare data
+        print(data == data2)
+
+        # use instance check for enable autocomplete in IDE
+        if isinstance(img.header, ImgHeader):
+            img.header.load_address = 5
+            img.header.timestamp = datetime(year=2020, month=6, day=12, hour=2)
+
+        # extend data
+        img.data += b'12345678'
+        print(img.info(align=13))

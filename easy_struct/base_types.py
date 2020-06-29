@@ -67,8 +67,9 @@ class IntBits:
                         self.validate(item[1])
                     except ValueError as e:
                         raise ValueError("choices: {}".format(str(e)))
-
                 self.choices = choices
+                if self.description is None:
+                    self.description = self.choices.__doc__
             else:
                 raise Exception()
 
@@ -156,7 +157,10 @@ class Int:
                 self.choices = [self.validate(v) for v in choices]
             elif isinstance(choices, type) and issubclass(choices, Enum):
                 for item in choices:
-                    self.validate(item[1])
+                    try:
+                        self.validate(item[1])
+                    except ValueError as e:
+                        raise ValueError("choices: {}".format(str(e)))
                 self.choices = choices
                 if self.description is None:
                     self.description = self.choices.__doc__
@@ -328,17 +332,21 @@ class Bytes:
 
     class_type = (bytes, bytearray)
 
-    __slots__ = ('size', 'empty', 'offset', 'default',  'name', 'description')
+    __slots__ = ('length', 'empty', 'offset', 'default',  'name', 'description')
 
-    def __init__(self, size: int, empty: int = 0, offset: int = 0, default: Union[bytes, bytearray, None] = None,
+    def __init__(self, length: Any, empty: int = 0, offset: int = 0, default: Union[bytes, bytearray, None] = None,
                  name: Optional[str] = None, desc: Optional[str] = None) -> None:
 
         self.name = name
-        self.size = size
         self.empty = empty
+        self.length = length
         self.offset = offset
         self.default = self.validate(default) if default is not None else default
         self.description = desc
+
+    @property
+    def size(self) -> int:
+        return self.length if isinstance(self.length, int) else 0
 
     def pack(self, value: bytearray) -> bytes:
         return bytes(value)
@@ -350,7 +358,7 @@ class Bytes:
         if not isinstance(value, (bytes, bytearray)):
             raise TypeError()
 
-        if len(value) != self.size:
+        if isinstance(self.length, int) and len(value) != self.length:
             raise ValueError()
 
         return value if isinstance(value, bytearray) else bytearray(value)

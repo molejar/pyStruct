@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from easy_struct.base_class import DataStructure, Struct
+from easy_struct.base_class import DataStructure, Struct, prefix
 from easy_struct.base_types import IntBits, Int, Float, String, Bytes, Array
 from easy_struct.help_types import *
 
@@ -23,6 +23,8 @@ __version__ = "0.0.1"
 __license__ = "Apache 2.0"
 __status__  = "Development"
 __all__ = [
+    # Helper functions
+    "prefix",
 
     # The Base class
     "DataStructure",

@@ -24,6 +24,10 @@ def loff(offset: int, tabsize: int, string: str) -> str:
     return str(" " * (tabsize * offset)) + string
 
 
+def prefix(offset: int, tabsize: int, name: str, align: int) -> str:
+    return str(" " * (tabsize * offset)) + name + ': ' + str(" " * (align - len(name)))
+
+
 def size_fmt(num: int, kibibyte: bool = True) -> str:
     base, suffix = [(1000., 'B'), (1024., 'iB')][kibibyte]
     for x in ['B'] + [x + suffix for x in list('kMGTP')]:
@@ -33,23 +37,24 @@ def size_fmt(num: int, kibibyte: bool = True) -> str:
     return "{} {}".format(num, x) if x == 'B' else "{:3.2f} {}".format(num, x)
 
 
-def fmt_int(name: str, metadata: Any, value: int, tabsize: int = 4, offset: int = 0) -> str:
+def fmt_int(name: str, metadata: Any, value: int, tabsize: int, offset: int, align: int) -> str:
     if not isinstance(value, int):
-        return loff(offset, tabsize, "{}: {}\n".format(name, str(value)))
+        return prefix(offset, tabsize, name, align) + str(value) + "\n"
     bits = metadata.bits if hasattr(metadata, 'bits') else metadata.bytes * 8
-    raw_value = value & (1 << bits) - 1 if value < 0 else value
+    raw_value = value & ((1 << bits) - 1) if value < 0 else value
     if metadata.print_format in ('x', 'X'):
-        fmt = "{{}}: 0x{{:0{}{}}}".format(bits // 4, metadata.print_format)
-        msg = loff(offset, tabsize, fmt.format(name, raw_value))
+        fmt = "0x{{:0{}{}}}".format(bits // 4, metadata.print_format)
+        msg = prefix(offset, tabsize, name, align) + fmt.format(raw_value)
     elif metadata.print_format in ('o', 'O'):
-        msg = loff(offset, tabsize, "{}: 0{:o}".format(name, raw_value))
+        msg = prefix(offset, tabsize, name, align) + "0{:o}".format(raw_value)
     elif metadata.print_format in ('b', 'B'):
-        fmt = "{{}}: 0b{{:0{}b}}".format(bits)
-        msg = loff(offset, tabsize, fmt.format(name, raw_value))
-    elif metadata.print_format in ('sz', 'SZ'):
-        msg = loff(offset, tabsize, "{}: {} ({})".format(name, value, size_fmt(value, metadata.print_format == 'sz')))
+        fmt = "0b{{:0{}b}}".format(bits)
+        msg = prefix(offset, tabsize, name, align) + fmt.format(name, raw_value)
+    elif metadata.print_format in ('z', 'Z'):
+        msg = prefix(offset, tabsize, name, align)
+        msg += "{} ({})".format(value, size_fmt(value, metadata.print_format == 'z'))
     else:
-        msg = loff(offset, tabsize, "{}: {}".format(name, value))
+        msg = prefix(offset, tabsize, name, align) + str(value)
     if isinstance(metadata.choices, type) and issubclass(metadata.choices, Enum):
         # msg += " ({}[{}])".format(metadata.choices.__name__, metadata.choices[value])
         msg += " ({})".format(metadata.choices[value])
@@ -57,14 +62,17 @@ def fmt_int(name: str, metadata: Any, value: int, tabsize: int = 4, offset: int 
 
 
 def fmt_bytes(name: str, metadata: Any, data: bytearray, tabsize: int = 4, offset: int = 0, line_size: int = 16) -> str:
-    if len(data) >= 16 ** 8:
+    if len(data) >= (16 ** 8):
         raise ValueError("hexdump cannot process more than 16**8 or 4294967296 bytes")
-    fmt = "{{:0{}X}} | {{:<{}s}} | {{}}\n".format(4 if len(data) < 16 ** 4 else 8, 3 * line_size - 1)
+    fmt = "{{:0{}X}} | {{:<{}s}} | {{}}\n".format(4 if len(data) < (16 ** 4) else 8, 3 * line_size - 1)
     msg = loff(offset, tabsize, "{}[{}]:\n".format(name, len(data)))
     for i in range(0, len(data), line_size):
         hex_text = " ".join(format(c, '02X') for c in data[i: i + line_size])
         raw_text = "".join(chr(c) if 32 <= c < 128 else '.' for c in data[i: i + line_size])
         msg += loff(offset + 1, tabsize, fmt.format(i, hex_text, raw_text))
+        if i > line_size * 10:
+            msg += loff(offset + 1, tabsize, "...\n")
+            break
     return msg
 
 
@@ -75,8 +83,8 @@ def fmt_array(name: str, metadata: Any, data: list, tabsize: int = 4, offset: in
     return msg
 
 
-def fmt_string(name: str, metadata: Any, value: str, tabsize: int = 4, offset: int = 0) -> str:
-    msg = loff(offset, tabsize, "{}: \"{}\"\n".format(name, value))
+def fmt_string(name: str, metadata: Any, value: str, tabsize: int, offset: int, align: int) -> str:
+    msg = prefix(offset, tabsize, name, align) + "\"{}\"\n".format(value)
     return msg
 
 
@@ -173,12 +181,16 @@ class DataStructure(metaclass=MetaStructure):
         if key in self.__dict__:
             annotations = getattr(self.__class__, '__annotations__')
             self.__dict__[key] = annotations[key].validate(value)
-
-        elif key in self.__class__.__dict__:
-            setattr(self.__class__, key, value)
-
         else:
-            raise AttributeError()
+            prop_obj = getattr(self.__class__, key, None)
+            if isinstance(prop_obj, property):
+                if prop_obj.fset is None:
+                    raise AttributeError("Property '{}' has not implemented setter".format(key))
+                prop_obj.fset(self, value)
+
+            else:
+                # super(DataStructure, self).__setattr__(key, value)
+                raise AttributeError("Add new attribute into object is forbidden")
 
     def __contains__(self, key):
         return True if isinstance(key, str) and key in self.__dict__.keys() else False
@@ -240,6 +252,9 @@ class DataStructure(metaclass=MetaStructure):
             if isinstance(mdata, Struct):
                 value = getattr(self, name)
                 size += value.raw_size()
+            if isinstance(mdata, Bytes):
+                value = getattr(self, name)
+                size += len(value)
             else:
                 size += mdata.size
 
@@ -253,40 +268,48 @@ class DataStructure(metaclass=MetaStructure):
         :param show_all:
         :return:
         """
-        msg = str()
         self.update()
+
+        msg = str()
+        if self.__doc__:
+            msg += loff(offset, tabsize, '[ ' + self.__doc__ + ' ]\n')
+
         for name, metadata in getattr(self.__class__, '__annotations__', {}).items():
-            if name[0] == '_':
-                if hasattr(self, name[1:]):
-                    name = name[1:]
-                elif not show_all:
+            value = getattr(self, name)
+            if name.startswith('_'):
+                name = name.lstrip('_')
+                if not hasattr(self, name) and not show_all:
                     continue
 
-            value = getattr(self, name)
-            if metadata.name is not None:
+            if metadata.name:
                 name = metadata.name
             if metadata.description is not None:
                 msg += loff(offset, tabsize, "# {}\n".format(metadata.description))
-            if isinstance(metadata, Struct):
-                msg += loff(offset, tabsize, "{}:\n".format(name))
-                msg += value.info(tabsize, offset + 1)
-            elif isinstance(metadata, Array):
-                msg += fmt_array(name, metadata, value, tabsize, offset)
-            elif isinstance(metadata, Bytes):
-                msg += fmt_bytes(name, metadata, value, tabsize, offset)
-            elif isinstance(metadata, Int):
-                msg += fmt_int(name, metadata, value, tabsize, offset)
-            elif isinstance(metadata, IntBits):
-                msg += fmt_int(name, metadata, value, tabsize, offset)
+            if hasattr(metadata, 'print_format') and callable(metadata.print_format):
+                msg += metadata.print_format(name, value, tabsize, offset, align)
+
             else:
-                msg += fmt_string(name, metadata, value, tabsize, offset)
+                if isinstance(metadata, Struct):
+                    msg += loff(offset, tabsize, "{}:\n".format(name))
+                    msg += value.info(tabsize, offset + 1, align, show_all)
+                elif isinstance(metadata, Array):
+                    msg += fmt_array(name, metadata, value, tabsize, offset)
+                elif isinstance(metadata, Bytes):
+                    msg += fmt_bytes(name, metadata, value, tabsize, offset)
+                elif isinstance(metadata, Int):
+                    msg += fmt_int(name, metadata, value, tabsize, offset, align)
+                elif isinstance(metadata, IntBits):
+                    msg += fmt_int(name, metadata, value, tabsize, offset, align)
+                else:
+                    msg += fmt_string(name, metadata, value, tabsize, offset, align)
 
         return msg
 
-    def export(self, empty: int = 0x00, update: bool = True) -> bytes:
+    def export(self, empty: int = 0x00, update: bool = True, ignore: Optional[list] = None) -> bytes:
         """
         :param empty:
         :param update:
+        :param ignore:
         :return:
         """
         assert 0 <= empty <= 0xFF
@@ -298,6 +321,8 @@ class DataStructure(metaclass=MetaStructure):
         ib_mdatas = []
 
         items = getattr(self.__class__, '__annotations__', {})
+        if ignore:
+            items = {k: v for k, v in items.items() if k not in ignore}
         names = tuple(items.keys())
 
         if update:
@@ -377,6 +402,18 @@ class DataStructure(metaclass=MetaStructure):
                 if isinstance(mdata, Struct):
                     value = mdata.struct.parse(data, offset)
                     offset += value.raw_size()
+                elif isinstance(mdata, Bytes):
+                    length = mdata.length
+                    if isinstance(length, str):
+                        il = kwargs
+                        for m in mdata.length.split('.'):
+                            if not il or m not in il:
+                                raise Exception()
+                            il = il[m]
+                        length = il
+                        
+                    value = bytearray(data[offset: offset + length])
+                    offset += length
                 else:
                     value = mdata.unpack(data, offset)
                     offset += mdata.size
@@ -395,6 +432,7 @@ class Struct:
     __slots__ = ('struct', 'offset', 'name', 'description')
 
     def __init__(self, struct: MetaStructure, offset: int = 0, name: Optional[str] = None, desc: Optional[str] = None):
+
         assert issubclass(struct, DataStructure)
 
         self.name = name
